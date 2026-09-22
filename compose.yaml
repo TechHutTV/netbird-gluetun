@@ -1,15 +1,15 @@
-name: lab-gluetun
+name: netbird-gluetun
 services:
   netns:
     image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
-    container_name: lab-gluetun-netns
+    container_name: netns
     entrypoint: ["/bin/sleep", "infinity"]
     sysctls:
       net.ipv6.conf.all.disable_ipv6: "1"
     restart: unless-stopped
   gluetun:
     image: qmcgaw/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
-    container_name: lab-gluetun-vpn
+    container_name: gluetun-vpn
     network_mode: service:netns
     depends_on:
       netns:
@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
   netbird:
     image: netbirdio/netbird:0.79.0@sha256:9d8480d87b7f7c10d67b820eecf332ecca5c2756792d4bdfa532182b4fc3005f
-    container_name: lab-gluetun-exit
+    container_name: netbird-exit
     network_mode: service:netns
     cap_add: [NET_ADMIN, SYS_ADMIN, SYS_RESOURCE]
     devices: [/dev/net/tun:/dev/net/tun]
