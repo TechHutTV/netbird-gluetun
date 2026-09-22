@@ -1,0 +1,18 @@
+name: lab-gluetun-client
+services:
+  netbird-client:
+    image: netbirdio/netbird:0.79.0@sha256:9d8480d87b7f7c10d67b820eecf332ecca5c2756792d4bdfa532182b4fc3005f
+    container_name: lab-gluetun-client
+    hostname: lab-gluetun-client
+    cap_add: [NET_ADMIN, SYS_ADMIN, SYS_RESOURCE]
+    devices: [/dev/net/tun:/dev/net/tun]
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: "1"
+    environment:
+      NB_SETUP_KEY: ${NETBIRD_CLIENT_SETUP_KEY}
+      NB_DISABLE_IPV6: "true"
+      NB_MANAGEMENT_URL: ${NETBIRD_MANAGMENT_URL}
+    volumes: [netbird-client:/var/lib/netbird]
+    restart: unless-stopped
+volumes:
+  netbird-client:
