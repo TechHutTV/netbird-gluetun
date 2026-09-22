@@ -1,14 +1,16 @@
-# Run a NetBird exit node through Gluetun and AirVPN
+# Run a NetBird exit node through Gluetun
 
-This article shows NetBird users how to run an exit node in Docker and send the exit node's internet traffic through an AirVPN WireGuard tunnel. It covers the NetBird objects, host configuration, routing, DNS, validation, and routine operations needed for a complete deployment.
+> Validation has only been performed with AirVPN on an isolated machine. Test your chosen Gluetun provider and network before relying on this deployment in production.
+
+This article shows NetBird users how to run an exit node in Docker and send the exit node's internet traffic through a Gluetun-supported VPN provider. It covers the NetBird objects, host configuration, routing, DNS, validation, and routine operations needed for a complete deployment.
 
 When a device selects this exit node, its internet traffic follows this path:
 
 ```text
-Your device → NetBird exit node → Gluetun → AirVPN → Internet
+Your device → NetBird exit node → Gluetun → VPN provider → Internet
 ```
 
-This configuration uses AirVPN WireGuard and IPv4. It blocks forwarded traffic when the provider tunnel is unavailable. The design was tested for IP routing, DNS handling, provider outages, and container recovery. Run the checks in this guide on your own network before treating the exit as a required isolation boundary.
+This configuration uses Gluetun and IPv4. It blocks forwarded traffic when the provider tunnel is unavailable. Run the checks in this guide on your own network before treating the exit as a required isolation boundary.
 
 ## Before you start
 
@@ -17,7 +19,7 @@ Have these ready:
 - A Linux host with Docker Engine and the Docker Compose plugin.
 - Permission to run Docker commands on that host.
 - Administrator access to your existing NetBird account.
-- An AirVPN account, WireGuard credentials, and a reserved forwarded port.
+- An account with a Gluetun-supported VPN provider and any credentials or forwarded port required by that provider.
 - A NetBird device to use for validation.
 
 The host needs `/dev/net/tun`. Check the Docker installation and tunnel device:
@@ -39,9 +41,7 @@ netbird-gluetun/
 ├── compose.yaml
 ├── .env.example
 ├── vpn-init.sh
-├── post-rules.txt
-└── gluetun/
-    └── servers.json
+└── post-rules.txt
 ```
 
 These files are required for the main deployment. Keep `client-compose.yaml` only if you want the optional validation container described at the end.
@@ -53,26 +53,24 @@ cp -n .env.example .env
 chmod 600 .env
 ```
 
-If you already have a `.env` in this folder, edit that file instead of replacing it. Never publish `.env`; it contains the AirVPN private key and the NetBird setup key.
+If you already have a `.env` in this folder, edit that file instead of replacing it. Never publish `.env`; it contains VPN credentials and the NetBird setup key.
 
-## 2. Enter your NetBird and AirVPN settings
+## 2. Enter your NetBird and Gluetun settings
 
-Open `.env` in your preferred text editor. Fill in these settings:
+Open `.env` in your preferred text editor. The included example uses AirVPN with WireGuard; fill in these settings for that provider:
 
 | Setting | Value |
 | --- | --- |
 | `NETBIRD_MANAGEMENT_URL` | Your existing NetBird management server's base URL, including `https://`. |
-| `VPN_SERVICE_PROVIDER` | `airvpn` |
-| `VPN_TYPE` | `wireguard` |
-| `WIREGUARD_PRIVATE_KEY` | The private key from your AirVPN WireGuard configuration. |
-| `WIREGUARD_PRESHARED_KEY` | The preshared key from the same configuration. |
-| `WIREGUARD_ADDRESSES` | The IPv4 tunnel address and prefix from that configuration. |
-| `SERVER_COUNTRIES` | Your chosen AirVPN server country. |
-| `SERVER_CITIES` | Your chosen city within that country. |
-| `FIREWALL_VPN_INPUT_PORTS` | A UDP-capable port reserved in your AirVPN account. |
+| `VPN_SERVICE_PROVIDER` | The Gluetun provider identifier. The example uses `airvpn`. |
+| `VPN_TYPE` | The provider-supported tunnel type. The example uses `wireguard`. |
+| `OPENVPN_USER` and `OPENVPN_PASSWORD` | Credentials for providers that use OpenVPN authentication. |
+| `WIREGUARD_PRIVATE_KEY`, `WIREGUARD_PRESHARED_KEY`, and `WIREGUARD_ADDRESSES` | WireGuard credentials and tunnel address when required by the provider. |
+| `SERVER_COUNTRIES`, `SERVER_REGIONS`, `SERVER_CITIES`, and `SERVER_HOSTNAMES` | Optional server selectors supported by the chosen provider. |
+| `FIREWALL_VPN_INPUT_PORTS` | A provider-forwarded UDP port, when required for NetBird connectivity. |
 | `TZ` | Your time zone, such as `Etc/UTC`. |
 
-Gluetun selects the AirVPN server using the country and city settings. The Compose file passes the reserved port to both Gluetun and NetBird, so they use the same port. It does not publish a port on the Docker host.
+Gluetun selects a provider server using the selectors supported by that provider. The Compose file passes the optional forwarded port to both Gluetun and NetBird, so they use the same port. It does not publish a port on the Docker host.
 
 Leave `NETBIRD_EXIT_SETUP_KEY` empty until you create the setup key in the NetBird dashboard. The optional `NETBIRD_CLIENT_SETUP_KEY` is only needed by `client-compose.yaml`; you can leave it empty for the main deployment. 
 
@@ -130,7 +128,7 @@ The deployment starts three containers:
 | Container | Purpose |
 | --- | --- |
 | the `netns` service | Keeps the shared network environment available when Gluetun is replaced. |
-| the `gluetun` service | Connects to AirVPN and runs the VPN firewall. |
+| the `gluetun` service | Connects to the selected provider and runs the VPN firewall. |
 | the `netbird` service | Connects to NetBird and forwards client traffic. |
 
 Wait for the `gluetun` service to become healthy. Then check NetBird:
@@ -141,7 +139,7 @@ docker compose exec netbird netbird status -d
 
 Management and Signal should be connected. The exit should have a NetBird address and use your reserved WireGuard port. In your NetBird dashboard, confirm that the new peer is in the exit group you created and that the default route is available to the users group.
 
-Get the current AirVPN public address:
+Get the current VPN public address:
 
 ```sh
 docker compose exec gluetun wget -qO- http://127.0.0.1:8000/v1/publicip/ip
@@ -170,7 +168,7 @@ curl -4 https://ifconfig.me/ip
 netbird status -d
 ```
 
-The public address should now match Gluetun's current AirVPN address. In the detailed status, find the exit peer. `Connection type: P2P` indicates a direct connection; a relayed connection may have different performance.
+The public address should now match Gluetun's current VPN address. In the detailed status, find the exit peer. `Connection type: P2P` indicates a direct connection; a relayed connection may have different performance.
 
 To return to the device's normal internet connection:
 
@@ -191,7 +189,7 @@ dig +short myip.opendns.com @resolver1.opendns.com
 dig whoami.akamai.net
 ```
 
-The first command should report the AirVPN address. The second gives information about the resolver handling the query. Cached answers can be misleading; neither command alone is a complete DNS leak test.
+The first command should report the VPN address. The second gives information about the resolver handling the query. Cached answers can be misleading; neither command alone is a complete DNS leak test.
 
 This deployment is IPv4-only. On every device that needs strict isolation, check IPv6 as well:
 
@@ -244,7 +242,7 @@ Avoid `docker compose down -v` unless you intend to delete the saved identity. A
 
 ## Troubleshooting
 
-**Gluetun never becomes healthy.** Check the AirVPN keys, tunnel address, country, and city in `.env`, then inspect the Gluetun logs. Review logs before sharing them so you do not disclose credentials.
+**Gluetun never becomes healthy.** Check the chosen provider's credentials, tunnel settings, and server selectors in `.env`, then inspect the Gluetun logs. Review logs before sharing them so you do not disclose credentials.
 
 **NetBird fails to register.** Check the management URL and setup key. If the one-use exit key expired before registration, create a replacement assigned to the exit group and update `NETBIRD_EXIT_SETUP_KEY` in `.env`. Recreate the NetBird container after changing it.
 
@@ -260,7 +258,7 @@ The priority-99 rule in `vpn-init.sh` is needed to send replies back to NetBird 
 
 **A changed NetBird setting does not take effect.** NetBird persists settings in its volume. Some changes require an explicit disconnect and reconnect inside the container. Do not delete the volume as your first troubleshooting step.
 
-**Speeds are lower than expected.** Check whether the peer connection is direct or relayed. This setup nests one encrypted tunnel inside another; route quality, packet loss, and MTU affect performance. The example Gluetun MTU is `1400`. Measure from your own client because results depend on the selected AirVPN server and network path.
+**Speeds are lower than expected.** Check whether the peer connection is direct or relayed. This setup nests one encrypted tunnel inside another; route quality, packet loss, and MTU affect performance. The example Gluetun MTU is `1400`. Measure from your own client because results depend on the selected VPN server and network path.
 
 ## Optional test container and cleanup
 
@@ -273,6 +271,6 @@ docker compose -f client-compose.yaml exec netbird-client netbird status -d
 docker compose -f client-compose.yaml exec netbird-client wget -qO- --timeout=10 https://ifconfig.me/ip
 ```
 
-The last command should print Gluetun's current AirVPN address. The validation container uses its dedicated setup key and its own persistent volume. Starting it does not select the exit on the Docker host.
+The last command should print Gluetun's current VPN address. The validation container uses its dedicated setup key and its own persistent volume. Starting it does not select the exit on the Docker host.
 
 For complete removal, first remove the exit route, policy, DNS configuration, groups, and setup key from the NetBird dashboard. Then stop the containers with `docker compose down`. Add `-v` only if you also want to delete the saved Docker identities; deleting the `netbird-exit` volume means the peer must register again with a new setup key.

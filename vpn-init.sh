@@ -41,7 +41,10 @@ iptables -t security -C LAB-VPN-ONLY -d 224.0.0.0/4 -j DROP 2>/dev/null || iptab
 iptables -t security -C LAB-VPN-ONLY -d 240.0.0.0/4 -j DROP 2>/dev/null || iptables -t security -A LAB-VPN-ONLY -d 240.0.0.0/4 -j DROP
 iptables -t security -C FORWARD -i wt0 -j LAB-VPN-ONLY 2>/dev/null || iptables -t security -A FORWARD -i wt0 -j LAB-VPN-ONLY
 
-# Only the provider WireGuard socket (fwmark 0xca6c) may use physical egress.
-# Local NetBird control and application sockets must wait for tun0.
-iptables -t security -C OUTPUT -o eth0 -m mark ! --mark 0xca6c -j DROP 2>/dev/null || iptables -t security -A OUTPUT -o eth0 -m mark ! --mark 0xca6c -j DROP
+# For WireGuard, only Gluetun's provider socket (fwmark 0xca6c) may use
+# physical egress. OpenVPN needs physical egress while establishing its tunnel,
+# so Gluetun's own firewall handles that provider path.
+if [ "${VPN_TYPE:-}" = wireguard ]; then
+    iptables -t security -C OUTPUT -o eth0 -m mark ! --mark 0xca6c -j DROP 2>/dev/null || iptables -t security -A OUTPUT -o eth0 -m mark ! --mark 0xca6c -j DROP
+fi
 exec /gluetun-entrypoint "$@"

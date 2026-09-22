@@ -1,19 +1,19 @@
-> This was only validated in a sand boxed environment, most testing to follow. Would not recommend in production. 
+> Validation has only been performed with AirVPN on an isolated machine. Test your chosen Gluetun provider and network before relying on this deployment in production.
 
-# NetBird exit node through Gluetun and AirVPN
+# NetBird exit node through Gluetun
 
-Run a NetBird exit node in Docker and send its internet traffic through an AirVPN WireGuard tunnel. This repository provides the Compose stack, VPN-only firewall, and a first-time setup guide for administrators who already use NetBird.
+Run a NetBird exit node in Docker and send its internet traffic through a Gluetun-supported VPN provider. This repository provides the Compose stack, VPN-only firewall, and a first-time setup guide for administrators who already use NetBird.
 
 ```text
-NetBird client → Docker exit node → Gluetun → AirVPN → Internet
+NetBird client → Docker exit node → Gluetun → VPN provider → Internet
 ```
 
-The exit node shares one persistent Docker network namespace between a namespace holder, Gluetun, and NetBird. Gluetun owns the provider tunnel and resolver. NetBird advertises the exit route and carries traffic from selected peers. The firewall drops forwarded traffic when the AirVPN tunnel is unavailable, preventing an ordinary internet fallback.
+The exit node shares one persistent Docker network namespace between a namespace holder, Gluetun, and NetBird. Gluetun owns the provider tunnel and resolver. NetBird advertises the exit route and carries traffic from selected peers. The firewall drops forwarded traffic when the VPN tunnel is unavailable, preventing an ordinary internet fallback.
 
 ## What this repository provides
 
 - A pinned Gluetun and NetBird Compose stack.
-- AirVPN WireGuard configuration with no host port publishing.
+- Gluetun provider configuration with no host port publishing.
 - A persistent namespace holder so container replacement does not strand the NetBird peer.
 - VPN-only forwarding and return-path routing for NetBird peers.
 - IPv4-only operation with IPv6 disabled explicitly.
@@ -26,14 +26,14 @@ The exit node shares one persistent Docker network namespace between a namespace
 - A Linux host with Docker Engine and the Docker Compose plugin.
 - `/dev/net/tun` available to Docker.
 - An existing NetBird account with administrator access to create groups, setup keys, routes, policies, and DNS settings.
-- An AirVPN account with a WireGuard configuration and a reserved forwarded UDP port.
+- An account with a Gluetun-supported VPN provider and any credentials or forwarded port required by that provider.
 - A NetBird device for validation.
 
 The host's own NetBird client does not need to be connected. The exit node runs inside Docker.
 
 ## Quick start
 
-Read [setup-guide.md](setup-guide.md) before starting. It explains the NetBird dashboard objects and the AirVPN values required by the Compose file.
+Read [setup-guide.md](setup-guide.md) before starting. It explains the NetBird dashboard objects and the Gluetun values required by the Compose file.
 
 Create the environment file and protect it:
 
@@ -42,7 +42,7 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Fill in the AirVPN values and paste the one-use NetBird exit setup key into `NETBIRD_EXIT_SETUP_KEY`. Then validate and start the stack:
+The supplied example uses AirVPN with WireGuard. Fill in those AirVPN values and paste the one-use NetBird exit setup key into `NETBIRD_EXIT_SETUP_KEY`. For another Gluetun provider, replace the provider-specific values as described in its Gluetun documentation. Then validate and start the stack:
 
 ```sh
 docker compose config --quiet
@@ -85,13 +85,12 @@ The supplied `.env.example` contains the values consumed by Compose:
 | `NETBIRD_MANAGEMENT_URL` | NetBird management URL. |
 | `NETBIRD_EXIT_SETUP_KEY` | One-use setup key created for the Docker exit peer. |
 | `NETBIRD_CLIENT_SETUP_KEY` | Optional setup key for `client-compose.yaml`. |
-| `VPN_SERVICE_PROVIDER` | `airvpn`. |
-| `VPN_TYPE` | `wireguard`. |
-| `WIREGUARD_PRIVATE_KEY` | AirVPN WireGuard private key. |
-| `WIREGUARD_PRESHARED_KEY` | AirVPN WireGuard preshared key. |
-| `WIREGUARD_ADDRESSES` | IPv4 tunnel address and prefix from AirVPN. |
-| `SERVER_COUNTRIES` and `SERVER_CITIES` | AirVPN server selection. |
-| `FIREWALL_VPN_INPUT_PORTS` | The reserved AirVPN UDP port used by both tunnels. |
+| `VPN_SERVICE_PROVIDER` | The Gluetun provider identifier. The example uses `airvpn`. |
+| `VPN_TYPE` | The provider-supported tunnel type. The example uses `wireguard`. |
+| `OPENVPN_USER` and `OPENVPN_PASSWORD` | Credentials for providers that use OpenVPN authentication. |
+| `WIREGUARD_PRIVATE_KEY`, `WIREGUARD_PRESHARED_KEY`, and `WIREGUARD_ADDRESSES` | WireGuard credentials and tunnel address when required by the provider. |
+| `SERVER_COUNTRIES`, `SERVER_REGIONS`, `SERVER_CITIES`, and `SERVER_HOSTNAMES` | Optional Gluetun server selectors supported by the chosen provider. |
+| `FIREWALL_VPN_INPUT_PORTS` | A provider-forwarded UDP port, when required for NetBird connectivity. |
 | `WIREGUARD_MTU` | Set to `1400` in Compose to avoid observed fragmentation. |
 | `TZ` | Container time zone. |
 
@@ -160,7 +159,7 @@ The exit path is enforced while the NetBird route is selected and the client rem
 
 IPv6 is disabled rather than tunneled. The VPN-only firewall is designed to blackhole traffic during provider loss, but each deployment should repeat its own outage and DNS checks before being used as a strict isolation boundary.
 
-The stack has no published Docker host ports. The reserved AirVPN UDP port is used inside the provider tunnel for NetBird connectivity.
+The stack has no published Docker host ports. A provider-forwarded UDP port, when configured, is used inside the provider tunnel for NetBird connectivity.
 
 ## Repository layout
 
@@ -170,7 +169,6 @@ client-compose.yaml   Optional disposable validation client
 vpn-init.sh           Startup, routing, stale-rule cleanup, and isolation rules
 post-rules.txt        Empty Gluetun post-firewall hook
 .env.example          Configuration template
-gluetun/              Gluetun server metadata
 setup-guide.md        First-time dashboard-based installation guide
 scripts/               Optional measurement and maintenance helpers
 evidence/              Development test evidence, not required at runtime
@@ -178,7 +176,7 @@ evidence/              Development test evidence, not required at runtime
 
 ## Troubleshooting
 
-If Gluetun is unhealthy, verify the AirVPN keys, tunnel address, server selection, and reserved port, then inspect `docker compose logs gluetun` without sharing secrets.
+If Gluetun is unhealthy, verify the chosen provider's credentials, tunnel settings, server selectors, and any required forwarded port, then inspect `docker compose logs gluetun` without sharing secrets.
 
 If NetBird does not register, verify that the setup key is valid, unused, assigned to the exit group, and present as `NETBIRD_EXIT_SETUP_KEY` in `.env`.
 
@@ -188,5 +186,5 @@ If the route is missing, verify that the device belongs to the users group, the 
 
 - [NetBird exit nodes](https://docs.netbird.io/use-cases/remote-access/exit-nodes)
 - [NetBird CLI](https://docs.netbird.io/get-started/cli)
-- [Gluetun AirVPN configuration](https://github.com/qdm12/gluetun-wiki/blob/main/setup/providers/airvpn.md)
-- [Gluetun WireGuard options](https://github.com/qdm12/gluetun-wiki/blob/main/setup/options/wireguard.md)
+- [Gluetun provider configuration](https://github.com/qdm12/gluetun-wiki/blob/main/setup/providers)
+- [Gluetun environment options](https://github.com/qdm12/gluetun-wiki/blob/main/setup/options)
