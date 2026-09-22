@@ -1,3 +1,5 @@
+> This was only validated in a sand boxed environment, most testing to follow. Would not recommend in production. 
+
 # NetBird exit node through Gluetun and AirVPN
 
 Run a NetBird exit node in Docker and send its internet traffic through an AirVPN WireGuard tunnel. This repository provides the Compose stack, VPN-only firewall, and a first-time setup guide for administrators who already use NetBird.
