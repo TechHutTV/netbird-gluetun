@@ -11,7 +11,7 @@ services:
     environment:
       NB_SETUP_KEY: ${NETBIRD_CLIENT_SETUP_KEY}
       NB_DISABLE_IPV6: "true"
-      NB_MANAGEMENT_URL: ${NETBIRD_MANAGMENT_URL}
+      NB_MANAGEMENT_URL: ${NETBIRD_MANAGEMENT_URL}
     volumes: [netbird-client:/var/lib/netbird]
     restart: unless-stopped
 volumes:

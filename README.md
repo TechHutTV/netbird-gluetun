@@ -82,7 +82,7 @@ The supplied `.env.example` contains the values consumed by Compose:
 
 | Variable | Description |
 | --- | --- |
-| `NETBIRD_MANAGMENT_URL` | NetBird management URL. The spelling is retained for compatibility with the supplied files. |
+| `NETBIRD_MANAGEMENT_URL` | NetBird management URL. |
 | `NETBIRD_EXIT_SETUP_KEY` | One-use setup key created for the Docker exit peer. |
 | `NETBIRD_CLIENT_SETUP_KEY` | Optional setup key for `client-compose.yaml`. |
 | `VPN_SERVICE_PROVIDER` | `airvpn`. |

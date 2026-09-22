@@ -61,7 +61,7 @@ Open `.env` in your preferred text editor. Fill in these settings:
 
 | Setting | Value |
 | --- | --- |
-| `NETBIRD_MANAGMENT_URL` | Your existing NetBird management server's base URL, including `https://`. |
+| `NETBIRD_MANAGEMENT_URL` | Your existing NetBird management server's base URL, including `https://`. |
 | `VPN_SERVICE_PROVIDER` | `airvpn` |
 | `VPN_TYPE` | `wireguard` |
 | `WIREGUARD_PRIVATE_KEY` | The private key from your AirVPN WireGuard configuration. |
@@ -71,8 +71,6 @@ Open `.env` in your preferred text editor. Fill in these settings:
 | `SERVER_CITIES` | Your chosen city within that country. |
 | `FIREWALL_VPN_INPUT_PORTS` | A UDP-capable port reserved in your AirVPN account. |
 | `TZ` | Your time zone, such as `Etc/UTC`. |
-
-`MANAGMENT` is intentionally spelled that way in the example files. Keep the spelling so Compose can read the setting.
 
 Gluetun selects the AirVPN server using the country and city settings. The Compose file passes the reserved port to both Gluetun and NetBird, so they use the same port. It does not publish a port on the Docker host.
 
